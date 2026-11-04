@@ -1680,6 +1680,29 @@ enum PostHogSurveysTest {
             #expect(matched.map(\.id) == (matches ? ["active_id"] : []))
         }
 
+        @Test("does not capture $feature_flag_called when checking survey targeting flags")
+        func doesNotCaptureFeatureFlagCalledForSurveyFlags() async throws {
+            var survey = try #require(try parseSurveys(activeSurvey).first)
+            survey["linked_flag_key"] = "linked-flag-enabled"
+            survey["targeting_flag_key"] = "survey-targeting-flag-enabled"
+            survey["internal_targeting_flag_key"] = "internal-targeting-flag-enabled"
+
+            let sut = getSut(surveys: [])
+            let surveys = sut.decodeSurveys(from: ["surveys": [survey]])
+            sut.updateSurveyCache(surveys, events: [:])
+            await withCheckedContinuation { continuation in
+                postHog.remoteConfig?.reloadFeatureFlags { _ in continuation.resume() }
+            }
+            let matched: [PostHogSurvey] = await withCheckedContinuation { continuation in
+                sut.getActiveMatchingSurveys { continuation.resume(returning: $0) }
+            }
+            #expect(matched.map(\.id) == ["active_id"])
+
+            postHog.flush()
+            let events = getBatchedEvents(server, timeout: 3, failIfNotCompleted: false)
+            #expect(!events.contains { $0.event == "$feature_flag_called" })
+        }
+
         @Test("Should not return surveys when any feature flag is disabled")
         func shouldFilterOutSurveysWhenAnyFlagIsDisabled() async {
             let sut = getSut(surveys: [surveyWithEnabledAndDisabledFlags])

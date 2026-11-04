@@ -276,7 +276,7 @@
                 return false
             }
 
-            return postHog.isFeatureEnabled(flagKey)
+            return postHog.isFeatureEnabled(flagKey, sendFeatureFlagEvent: false)
         }
 
         private func matchesLinkedFlagVariant(_ survey: PostHogSurvey) -> Bool {
